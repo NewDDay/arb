@@ -1,0 +1,13 @@
+{
+"symbols": {
+	"symbol1" : "BNBBTC",
+	"symbol2" : "LTCBNB",
+ 	"symbol3" : "LTCBTC"},
+"logging": {
+	"orders in csv" : 1,
+	"orders in pg" : 0,
+	"changes balance in csv" : 1,
+ 	"changes balance in pg" : 0},
+"other": {
+	"timeout" : 0.05}
+}
