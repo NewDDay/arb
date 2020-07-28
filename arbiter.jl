@@ -20,7 +20,7 @@ while true
 		global LTC =  (execute(conn, """	select * from arb(0.1, 'LTC')""") |> DataFrame).arb[1]
 	end
 	src.logging(4, string(LTC))
-	if (LTC > 0.100023) && (LTC < 10)
+	if (LTC > 0.1003) && (LTC < 10)
 		
 		@async BN.executeOrder(BN.createOrder("LTCBTC", "sell"; quantity = pLTCBTC, orderType="MARKET"), BN.apiKey, BN.apiSecret)
 		sleep(0.05)
@@ -35,7 +35,7 @@ while true
 		#global BalanceBTC = balance[1]["free"]
 		#global BalanceBNB = balance[5]["free"]
 	end
-	if (LTC > 10.100023)
+	if (LTC > 10.1003)
 		@async BN.executeOrder(BN.createOrder("LTCBNB", "sell"; quantity = pLTCBNB, orderType="MARKET"), BN.apiKey, BN.apiSecret)
 		sleep(0.05)
 		@async BN.executeOrder(BN.createOrder("BNBBTC", "sell"; quantity = pBNBBTC, orderType="MARKET"), BN.apiKey, BN.apiSecret)
