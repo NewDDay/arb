@@ -10,7 +10,7 @@ function wsparse(json::Vector{UInt8})
 end
 
 function infile(book::Vector{RegexMatch})
-    open("./arb/orderbooks/LTCBTC.csv", "w+") do io
+    open("./arb/orderbooks/LTCBNB.csv", "w+") do io
         write(io, "askprice,askquantity,bidprice,bidquantity,time,id\n")
         write(io, "$(book[12].match),$(book[13].match),$(book[2].match),$(book[3].match),$(now(UTC)),$(book[1].match)\n")
         write(io, "$(book[14].match),$(book[15].match),$(book[4].match),$(book[5].match)\n")
@@ -20,14 +20,14 @@ function infile(book::Vector{RegexMatch})
     end
 end
 
-HTTP.WebSockets.open(string(BN.BINANCE_API_WS, lowercase("LTCBTC"), string("@depth", 5, "@100ms")); verbose=false) do io
+HTTP.WebSockets.open(string(BN.BINANCE_API_WS, lowercase("LTCBNB"), string("@depth", 5, "@100ms")); verbose=false) do io
     while !eof(io)
         book = wsparse(readavailable(io))
         try
             infile(book)
         catch
-            @error("Не удалость записать ордербук LTCBTC") # "julia > book &". При это команде, эта строка выбьется в консоль
-            println("Не удалость записать ордербук LTCBTC") # А эта в файл.
+            @error("Не удалость записать ордербук LTCBNB") # "julia > book &". При это команде, эта строка выбьется в консоль
+            println("Не удалость записать ордербук LTCBNB") # А эта в файл.
         end
     end
 end
