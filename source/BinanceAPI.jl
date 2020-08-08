@@ -91,8 +91,9 @@ module BN
     function wsFunction(channel::Channel, ws::String, symbol::String)
         HTTP.WebSockets.open(string(BINANCE_API_WS, lowercase(symbol), ws); verbose=false) do io
             while !eof(io)
-                put!(channel, r2j(readavailable(io)))
-                #println(r2j(readavailable(io)))
+                json = r2j(readavailable(io))
+                get!(json, "symbol", symbol)
+                put!(channel, json)
             end
         end
     end

@@ -1,54 +1,64 @@
-
 cd("$(@__DIR__)/..") #Все файлы начинают с корневой директории
 
 include("./source/BinanceAPI.jl")
 include("./source/source.jl")
-using JSON, Dates, LibPQ, DataFrames
+using JSON, Dates, DataFrames, HTTP
 
-src.logging(1, "Start arbiter")
+src.logging(1, "Библиотеки и модули загружены")
 
-balance = BN.account()["balances"]
-global BalanceLTC = balance[2]["free"]
-global BalanceBTC = balance[1]["free"]
-global BalanceBNB = balance[5]["free"]
+channel = Channel(1)
 
-while true
-	pBNBBTC = 0.12
-	pLTCBTC = 0.05
-	pLTCBNB = 0.05
-	LibPQ.Connection(src.data()["connPG"]) do conn
-		global LTC =  (execute(conn, """	select * from arb(0.1, 'LTC')""") |> DataFrame).arb[1]
+@async BN.wsDepth(channel, src.config()["symbols"]["symbol1"])
+@async BN.wsDepth(channel, src.config()["symbols"]["symbol2"])
+@async BN.wsDepth(channel, src.config()["symbols"]["symbol3"])
+
+while !((@isdefined bookLTCBNB) && (@isdefined bookLTCBTC) && (@isdefined bookBNBBTC))
+	buffer = take!(channel)
+	if buffer["symbol"] == "LTCBNB"
+		global bookLTCBNB = buffer
 	end
-	src.logging(4, string(LTC))
-	if (LTC > 0.1003) && (LTC < 10)
-		
-		@async BN.executeOrder(BN.createOrder("LTCBTC", "sell"; quantity = pLTCBTC, orderType="MARKET"), BN.apiKey, BN.apiSecret)
-		sleep(0.05)
-		@async BN.executeOrder(BN.createOrder("BNBBTC", "buy"; quantity = pBNBBTC, orderType="MARKET"), BN.apiKey, BN.apiSecret)
-		sleep(0.05)
-		@async BN.executeOrder(BN.createOrder("LTCBNB", "buy"; quantity = pLTCBNB, orderType="MARKET"), BN.apiKey, BN.apiSecret)
-		sleep(0.2)
-		#balance = BN.account()["balances"]
-		#src.logging(7, """LTC, BTC, BNB\t$(balance[2]["free"])\t$(balance[1]["free"])\t$(balance[5]["free"])""")
-		#src.logging(6, """LTC, BTC, BNB\t$(balance[2]["free"]-BalanceLTC)\t$(balance[1]["free"]-BalanceBTC)\t$(balance[5]["free"]-BalanceBNB)""")
-		#global BalanceLTC = balance[2]["free"]
-		#global BalanceBTC = balance[1]["free"]
-		#global BalanceBNB = balance[5]["free"]
+	if buffer["symbol"] == "LTCBTC"
+		global bookLTCBTC = buffer
 	end
-	if (LTC > 10.1003)
-		@async BN.executeOrder(BN.createOrder("LTCBNB", "sell"; quantity = pLTCBNB, orderType="MARKET"), BN.apiKey, BN.apiSecret)
-		sleep(0.05)
-		@async BN.executeOrder(BN.createOrder("BNBBTC", "sell"; quantity = pBNBBTC, orderType="MARKET"), BN.apiKey, BN.apiSecret)
-		sleep(0.05)
-		@async BN.executeOrder(BN.createOrder("LTCBTC", "buy"; quantity = pLTCBTC, orderType="MARKET"), BN.apiKey, BN.apiSecret)
-		sleep(0.2)
-		#balance = BN.account()["balances"]
-		#src.logging(7, """LTC, BTC, BNB\t$(balance[2]["free"])\t$(balance[1]["free"])\t$(balance[5]["free"])""")
-		#src.logging(6, """LTC, BTC, BNB\t$(balance[2]["free"]-BalanceLTC)\t$(balance[1]["free"]-BalanceBTC)\t$(balance[5]["free"]-BalanceBNB)""")
-		#global BalanceLTC = balance[2]["free"]
-		#global BalanceBTC = balance[1]["free"]
-		#global BalanceBNB = balance[5]["free"]
+	if buffer["symbol"] == "BNBBTC"
+		global bookBNBBTC = buffer
 	end
 end
 
-src.logging(9, "Арбитр вышел из цикла")
+
+sleep(2)
+
+while true
+	buffer = take!(channel)
+	if buffer["symbol"] == "LTCBNB"
+		global bookLTCBNB = buffer
+		#src.logging(2, "$(src.config()["symbols"]["symbol2"]) - $(bookLTCBNB["lastUpdateId"])")
+	end
+	if buffer["symbol"] == "LTCBTC"
+		global bookLTCBTC = buffer
+		#src.logging(2, "$(src.config()["symbols"]["symbol3"]) - $(bookLTCBTC["lastUpdateId"])")
+	end
+	if buffer["symbol"] == "BNBBTC"
+		global bookBNBBTC = buffer
+		#src.logging(2, "$(src.config()["symbols"]["symbol1"]) - $(bookBNBBTC["lastUpdateId"])")
+	end
+
+	BNB = parse(Float64, bookLTCBNB["asks"][1][1]) # Я купил BNB
+	BTC = parse(Float64, bookLTCBTC["bids"][1][1]) # Я продал BTC
+	k = (BTC/BNB)/parse(Float64, bookBNBBTC["bids"][1][1])
+	src.logging(1, "Туды - $k")
+	if k > 1.0003
+		@async BN.executeOrder(BN.createOrder("LTCBNB", "sell"; quantity = 0.05, orderType="MARKET"), BN.apiKey, BN.apiSecret)
+		@async BN.executeOrder(BN.createOrder("LTCBTC", "buy"; quantity = 0.05, orderType="MARKET"), BN.apiKey, BN.apiSecret)
+		@async BN.executeOrder(BN.createOrder("BNBBTC", "sell"; quantity = 0.12, orderType="MARKET"), BN.apiKey, BN.apiSecret)
+	end
+	BNB = parse(Float64, bookLTCBNB["bids"][1][1]) # Я продал BNB
+	BTC = parse(Float64, bookLTCBTC["asks"][1][1]) # Я купил BTC
+	k = (BTC/BNB)/parse(Float64, bookBNBBTC["asks"][1][1])
+	src.logging(1, "Сюды - $k")
+	if k > 1.0003
+		@async BN.executeOrder(BN.createOrder("LTCBNB", "buy"; quantity = 0.05, orderType="MARKET"), BN.apiKey, BN.apiSecret)
+		@async BN.executeOrder(BN.createOrder("LTCBTC", "sell"; quantity = 0.05, orderType="MARKET"), BN.apiKey, BN.apiSecret)
+		@async BN.executeOrder(BN.createOrder("BNBBTC", "buy"; quantity = 0.12, orderType="MARKET"), BN.apiKey, BN.apiSecret)
+	end
+end

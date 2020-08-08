@@ -31,6 +31,22 @@ using Dates, JSON, CSV, DataFrames, LibPQ
         end
     end
 
+    function logging(namefile::String, relevance::Integer, str::String)
+        if -1 < relevance < 10
+            try
+                open("./arb/logs/$namefile", "a") do io
+                    write(io, "[$(now(UTC))][$relevance] \t$str \n")
+                end
+            catch
+                @error("Не удаётся открыть лог файл") # "julia > book &". При это команде, эта строка выбьется в консоль
+                println("Не удаётся открыть лог файл") # А эта в файл.
+            end
+        else
+            @error("Не правильный приоритет! Логи не ведутся!")
+            println("Не правильный приоритет! Логи не ведутся!")
+        end
+    end
+
 
     """
         balanceupd(balance :: Vector)
